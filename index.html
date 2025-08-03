@@ -120,24 +120,22 @@
                 return file;
             }
 
-            // TODO: Adding file twice deletes other file?
+            // TODO: Adding file twice deletes other file???
             const submitFile = (e) => {
                 e.preventDefault();
+                if (e.target.fileinput.files[0].name in fileIndex) {
+                    return;
+                }
+
                 const reader = new FileReader();
 
                 reader.onload = (event) => {
                     const fileContent = event.target.result;
                     const lines = fileContent.split(/\r\n|\n/); // Split by common line endings
                     const fileObj = processFileLines(e.target.fileinput.files[0].name, lines);
-                    console.log('test');
-                    console.log(fileIndex);
-                    console.log(files);
                     if (e.target.fileinput.files[0].name in fileIndex) {
                         deleteFile(fileObj);
                     }
-                    console.log(fileIndex);
-                    console.log(files);
-                    console.log('testEND');
                     addFile(fileObj);
                 };
 
