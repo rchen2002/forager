@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <link rel="stylesheet" href="./index.css" />
+    </head>
+    <body>
+        <div class="signin" id="signin">
+            <div class="input-group">
+                <label class="input-label" for="search">
+                    Currently a WIP, enter password to view
+                </label>
+                <form onsubmit="submitPassword(event)">
+                    <input class="text-input" id="pwd" type="text">
+                    <input type="submit" value="Submit"/>
+                </form>
+            </div>
+        </div>
+        <div class="screen" id="screen" style="display: none;">
+            <div class="search-interface">
+                <div class="inputs">
+                    <div class="input-group">
+                        <label class="input-label" for="search">
+                            Search Files
+                        </label>
+                        <form class="base-form" onsubmit="searchFiles(event)">
+                            <input class="text-input" id="search" type="text">
+                            <input type="submit" value="Search"/>
+                        </form>
+                    </div>
+                    <div class="input-group">
+                        <label class="input-label" for="search">
+                            Upload Files
+                        </label>
+                        <form class="base-form" onsubmit="submitFile(event)">
+                            <input class="file-input" id="fileinput" type="file" value="Select File" accept='.csv,.tsv'/>
+                            <input type="submit" value="Add Selected File"/>
+                        </form>
+                    </div>
+                </div>
+                <div class="results" id="results" style="display: none;">
+                    <div class="results-content" id="results-content"></div>
+                    <button onclick="clearResults()">Clear Results</button>
+                </div>
+            </div>
+            <div class="files-disp" id="files-disp" hidden>
+                <h2 style="margin-bottom: 0; color: white">
+                    Added Files:
+                </h2>
+                <span style="color: white">
+                    (click to remove)
+                </span>
+                <div class="added-files" id="added-files"></div>
+            </div>
+        </div>
+
+        <script>
+            var fileIndex = {};
+            var files = [];
+            // var files = [{ "name": "test", "columns": ["dummy", "col2", "another column"],  "plates": {"abc": ["TTT", 't', "333"]} }];  // [[[<FILE_NAME>, [<COL_NAME>, ...]], {<PLATE_STR>: [[<PLATE_INFO>, ...], ...]}], ...]
+
+            const repopulateFileDisp = () => {
+                const filesDisp = document.getElementById('added-files');
+                filesDisp.innerHTML = "";
+                if (Object.keys(fileIndex).length > 0) {
+                    for (const [key, value] of Object.entries(fileIndex)) {
+                        const btn = document.createElement('button');
+                        btn.textContent = key;
+                        btn.addEventListener('click', () => {
+                            deleteFile(key);
+                        });
+                        filesDisp.appendChild(btn);
+                    }
+                    document.getElementById('files-disp').removeAttribute('hidden');
+                } else {
+                    document.getElementById('files-disp').setAttribute('hidden', ''); 
+                }
+            }
+
+            const addFile = (fileObj) => {
+                files.push(fileObj);
+                fileIndex[fileObj['name']] = files.length-1;
+                repopulateFileDisp();
+            }
+
+            const deleteFile = (fileName) => {
+                files.splice(fileIndex[fileName], 1);
+                fileIndex = {};
+                for (let i = 0; i < files.length; i++) {
+                    fileIndex[files[i]['name']] = i;
+                }
+                repopulateFileDisp();
+            }
+
+            const processFileLines = (fileName, lines) => {
+                var columns = lines[0].split(',').map((col) => col.replaceAll('"', '').trim());
+                var plate_col = columns.indexOf('plate');
+                var start_line = 1;
+                if (plate_col === -1) {
+                    const colCount = columns.length;
+                    columns = ["plate"];
+                    for (let i = 1; i < colCount; i++) {
+                        columns.push(i);
+                    }
+                    plate_col = 0;
+                    start_line = 1;
+                }
+
+                var plates = {};
+                for (const line of lines.slice(start_line)) {
+                    const values = line.split(',').map((col) => col.replaceAll('"', '').trim());
+                    plates[values[plate_col]] = values;
+                    // plates[values[plate_col]] = [...(plates[values[plate_col]] || []), values];
+                }
+
+                file = {
+                    "name": fileName,
+                    "columns": columns,
+                    "plates": plates,
+                };
+                return file;
+            }
+
+            // TODO: Adding file twice deletes other file?
+            const submitFile = (e) => {
+                e.preventDefault();
+                const reader = new FileReader();
+
+                reader.onload = (event) => {
+                    const fileContent = event.target.result;
+                    const lines = fileContent.split(/\r\n|\n/); // Split by common line endings
+                    const fileObj = processFileLines(e.target.fileinput.files[0].name, lines);
+                    console.log('test');
+                    console.log(fileIndex);
+                    console.log(files);
+                    if (e.target.fileinput.files[0].name in fileIndex) {
+                        deleteFile(fileObj);
+                    }
+                    console.log(fileIndex);
+                    console.log(files);
+                    console.log('testEND');
+                    addFile(fileObj);
+                };
+
+                reader.readAsText(e.target.fileinput.files[0]);
+            }
+
+            const populateResults = (matches, match_cols) => {
+                const display_div = document.getElementById('results-content');
+                for (const key of Object.keys(matches)) {
+                    display_div.appendChild(document.createElement('hr'));
+                    const table_title = document.createElement('h2');
+                    table_title.textContent = key;
+                    table_title.style = 'color: white;'
+                    display_div.appendChild(table_title);
+
+                    const match_table = document.createElement('table');
+                    
+                    const table_header = document.createElement('thead');
+                    const header_row = document.createElement('tr');
+                    for (const col of match_cols[key]) {
+                        var th_col = document.createElement('th');
+                        th_col.textContent = col;
+                        header_row.appendChild(th_col);
+                    }
+                    table_header.appendChild(header_row)
+                    match_table.appendChild(table_header)
+                    
+                    const table_body = document.createElement('tbody');
+                    for (const mtc of matches[key]) {
+                        var row = document.createElement('tr');
+                        for (const col of mtc) {
+                            var td_col = document.createElement('td');
+                            td_col.textContent = col;
+                            row.appendChild(td_col);
+                        }
+                        table_body.appendChild(row)
+                    }
+                    match_table.appendChild(table_body)
+
+                    display_div.appendChild(match_table);
+                }
+
+                display_div.appendChild(document.createElement('hr'));
+
+                document.getElementById('results').style.removeProperty('display');
+            }
+
+            const clearResults = () => {
+                document.getElementById('results-content').innerHTML = "";
+                document.getElementById('results').style.setProperty('display', 'none');
+            }
+
+            const searchFiles = (e) => {
+                e.preventDefault();
+                
+                clearResults();
+                
+                var matches = {};
+                var match_cols = {};
+                for (const file_data of files) {
+                    let plate_info = file_data['plates'][e.target.search.value.trim()];
+                    if (plate_info) {
+                        matches[file_data['name']] = [...(matches[file_data['name']] || []), plate_info];
+                        match_cols[file_data['name']] = file_data['columns'];
+                    }
+                }
+                populateResults(matches, match_cols);
+            }
+
+            const submitPassword = (e) => {
+                e.preventDefault();
+                if (e.target.elements.pwd.value === 'lalala') {
+                    document.getElementById('signin').style.setProperty('display', 'none');
+                    document.getElementById('screen').style.removeProperty('display');
+                }
+            }
+        </script>
+    </body>
+</html>
